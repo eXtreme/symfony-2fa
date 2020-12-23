@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">
+</head>
+<body>
+    <main class="container">
+
+        <div id="login"{% if status != 'anonymous' %} style="display: none"{% endif %}>
+            <div class="row">
+                <div class="col">
+                    <form>
+                        <div class="mb-3">
+                            <label class="form-label">Username (demo)</label>
+                            <input type="text" name="username" class="form-control" value="demo">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password (demo)</label>
+                            <input type="password" name="password" class="form-control" value="demo">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="twoFactor"{% if status != '2fa' %} style="display: none"{% endif %}>
+            <div class="row">
+                <div class="col">
+                    <form>
+                        <div class="mb-3">
+                            <label class="form-label">Code</label>
+                            <input type="text" name="code" class="form-control">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                        <button data-action="logout" class="btn btn-secondary">Cancel</button>
+                    </form>
+                </div>
+                <div class="col">
+                    <img src="{{ path('qr_code') }}" />
+                </div>
+            </div>
+        </div>
+
+        <div id="authenticated"{% if status != 'authenticated' %} style="display: none"{% endif %}>
+            authed!
+
+            <button data-action="logout" class="btn btn-secondary">Logout</button>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW" crossorigin="anonymous"></script>
+
+    <script>
+        function checkResponse(response) {
+            if (response.status >= 200 && response.status < 500) {
+                return response;
+            }
+            throw response;
+        }
+
+        function json(response) {
+            return response.json();
+        }
+
+        (function () {
+            const $login = document.getElementById('login');
+            const $twoFactor = document.getElementById('twoFactor');
+            const $authenticated = document.getElementById('authenticated');
+
+            const $loginForm = $login.querySelector('form');
+            $loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                const $inputUsername = $loginForm.querySelector('input[name="username"]');
+                const $inputPassword = $loginForm.querySelector('input[name="password"]');
+
+                fetch('/login', {
+                    method: 'post',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username: $inputUsername.value, password: $inputPassword.value }),
+                })
+                    .then(checkResponse)
+                    .then(json)
+                    .then((res) => {
+                        if (res.status === 'success') {
+                            $login.style.display = 'none';
+                        } else if (res.status === '2fa') {
+                            $login.style.display = 'none';
+                            $twoFactor.style.display = 'block';
+                        }
+                        if ('error' in res) {
+                            alert('Error: '+res.error);
+                        }
+                    })
+                    .catch(errorResponse => {
+                        console.error(errorResponse);
+                    });
+            }, false);
+
+            const $twoFactorForm = $twoFactor.querySelector('form');
+            $twoFactorForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                const $inputCode = $twoFactorForm.querySelector('input[name="code"]');
+
+                const formData = new FormData();
+                formData.append('_auth_code', $inputCode.value);
+
+                fetch('/2fa_check', {
+                    method: 'post',
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                })
+                    .then(checkResponse)
+                    .then(json)
+                    .then((res) => {
+                        if (res.status === 'success') {
+                            $twoFactor.style.display = 'none';
+                            $authenticated.style.display = 'block';
+                        } else if (res.status === 'error') {
+                            alert(res.error.key+" - "+res.error.message);
+                        }
+                    })
+                    .catch(errorResponse => {
+                        console.error(errorResponse);
+                    });
+            }, false);
+
+            const handleLogout = (e) => {
+                console.log('Start LOGOUT');
+                e.stopPropagation();
+                e.preventDefault();
+
+                fetch('/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                    redirect: 'manual',
+                })
+                    .then(() => {
+                        window.location.reload();
+                    });
+            };
+
+            const $twoFactorCancel = $twoFactor.querySelector('[data-action="logout"]');
+            const $authenticatedLogout = $authenticated.querySelector('[data-action="logout"]');
+            $twoFactorCancel.addEventListener('click', handleLogout, false);
+            $authenticatedLogout.addEventListener('click', handleLogout, false);
+        })();
+    </script>
+</body>
+</html>

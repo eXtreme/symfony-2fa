@@ -1,24 +1,44 @@
 security:
-    # https://symfony.com/doc/current/security.html#where-do-users-come-from-user-providers
+    enable_authenticator_manager: true
+
+#    access_decision_manager:
+#        strategy: unanimous
+
+    encoders:
+        App\Security\AppUser: 'plaintext'
     providers:
-        users_in_memory: { memory: null }
+        app_users:
+            id: App\Security\AppUserProvider
+
     firewalls:
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
         main:
-            anonymous: true
-            lazy: true
-            provider: users_in_memory
+            pattern: .*
+            # REMOVE ANONYMOUS WHEN enable_authenticator_manage=true
+#            anonymous: true
+            lazy: false
+            provider: app_users
+            logout:
+                path: api_logout
+                invalidate_session: true
+                success_handler: App\Security\LogoutSuccessHandler
+            two_factor:
+                auth_form_path: api_2fa_login
+                check_path: api_2fa_check
+                prepare_on_login: true
+                prepare_on_access_denied: true
+                authentication_required_handler: App\Security\TwoFactorRequiredHandler
+                success_handler: App\Security\TwoFactorSuccessHandler
+                failure_handler: App\Security\TwoFactorFailureHandler
+            json_login:
+                check_path: api_login
+                success_handler: App\Security\LoginSuccessHandler
 
-            # activate different ways to authenticate
-            # https://symfony.com/doc/current/security.html#firewalls-authentication
-
-            # https://symfony.com/doc/current/security/impersonating_user.html
-            # switch_user: true
-
-    # Easy way to control access for large sections of your site
-    # Note: Only the *first* access control that matches will be used
     access_control:
-        # - { path: ^/admin, roles: ROLE_ADMIN }
-        # - { path: ^/profile, roles: ROLE_USER }
+        - { path: '^/logout', roles: IS_AUTHENTICATED_ANONYMOUSLY }
+        - { path: '^/login', roles: IS_AUTHENTICATED_ANONYMOUSLY }
+        - { path: '^/2fa', roles: IS_AUTHENTICATED_2FA_IN_PROGRESS }
+        - { path: '^/protected', roles: IS_AUTHENTICATED_FULLY }
+        - { path: '^/', roles: IS_AUTHENTICATED_ANONYMOUSLY }
